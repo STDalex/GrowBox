@@ -31,6 +31,8 @@ DHTesp dht;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, 10800);
 
+WiFiServer server(80);
+String header; // header for contain params for web client
 //const char* ssid = "AndroidAPA5A0";
 //const char* password = "hbmt2459";
 const char* ssid = "TP-LINK_7C1B64";
@@ -38,34 +40,13 @@ const char* password = "12161003";
 
 U8X8_SSD1306_128X64_NONAME_SW_I2C u8x8(/* clock=*/ 15, /* data=*/ 4, /* reset=*/ 16);
 
-WiFiServer server(80);
-
-
 String LED_State = "off";
-
 int m_phase; // growth stage 
 int m_phase_state [4];
 bool m_is_new_day = true;
 int m_start_growth; // 0 - stop growth, 1 - start growth
 
-String header; // header for contain params for web client
-
-
 Preferences preferences;
-
-hw_timer_t * timer = NULL;
-volatile SemaphoreHandle_t timerSemaphore;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-
-//int interruptCounter = 0;
-void IRAM_ATTR onTimer() {
-//  portENTER_CRITICAL_ISR(&timerMux);
- // interruptCounter++;
-  timeClient.update();
-//  xSemaphoreGiveFromISR(timerSemaphore, NULL);
-//  Serial.println(interruptCounter);
-//  portEXIT_CRITICAL_ISR(&timerMux);
-}
 
 void setup(void) {
   pinMode(led, OUTPUT);
@@ -88,9 +69,7 @@ void setup(void) {
   
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.println("");
 
-  // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     delay(50);
     Serial.print(".");
@@ -105,13 +84,6 @@ void setup(void) {
 
   server.begin();
   Serial.println("HTTP server started");
-
-  // Create semaphore to inform us when the timer has fired
-  timerSemaphore = xSemaphoreCreateBinary();
-  timer = timerBegin(3, 80, true);
-  timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 5000000, true);
- // timerAlarmEnable(timer);
 }
 
 void loop(void) {
@@ -183,8 +155,7 @@ void loop(void) {
                 break;
               }
             }
-            
-            
+                     
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> <meta http-equiv=\"refresh\" content=\"20; url=/\">");
             client.println("<link rel=\"icon\" href=\"data:,\">");
@@ -195,14 +166,7 @@ void loop(void) {
             client.println(".button2 {background-color: #555555;}</style></head>");
             
             client.println("<body><h1><a href=\"/\">GROWTH BOX</a></h1>");
-            
-            
-            
-         /*   if (LED_State=="off") {
-              client.println("<p><a href=\"/LED/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/LED/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }*/
+
             client.println("<form action=\"/new\">\n");
             if (m_start_growth == 0)            
               client.println("<input type=\"submit\" class=\"button\" value=\"START GROWTH\">\n");
