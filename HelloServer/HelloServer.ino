@@ -25,7 +25,15 @@ uint8_t temprature_sens_read();
 #endif
 uint8_t temprature_sens_read();
 
-#define led 25
+#define LED 25
+#define RELAY_1 5
+#define RELAY_2 17
+#define GHT22_SENSOR 13
+#define SOIL_VCC 26
+#define SOIL_SENSOR 34
+#define PH_METER 35
+#define TOUCH_PIN 27
+
 
 DHTesp dht;
 WiFiUDP ntpUDP;
@@ -45,19 +53,28 @@ int m_phase; // growth stage
 int m_phase_state [4];
 bool m_is_new_day = true;
 int m_start_growth; // 0 - stop growth, 1 - start growth
+int m_ph_read;
+int m_soil_read;
 
 Preferences preferences;
 
 void setup(void) {
-  pinMode(led, OUTPUT);
-  digitalWrite(led, 0);
   Serial.begin(115200);
+  
+  pinMode(LED, OUTPUT);
+  pinMode(RELAY_1, OUTPUT);
+  pinMode(RELAY_2, OUTPUT);
+  pinMode(SOIL_VCC, OUTPUT);
+  digitalWrite(LED, 0);
+  digitalWrite(RELAY_1, 1);
+  digitalWrite(RELAY_2, 1);
+  digitalWrite(SOIL_VCC, 0);
   
   u8x8.begin();
   u8x8.setFont(u8x8_font_chroma48medium8_r);
   u8x8.drawString(0, 0, "Hello!");
 
-  dht.setup(13, DHTesp::DHT22);
+  dht.setup(GHT22_SENSOR, DHTesp::DHT22);
   timeClient.begin();
   preferences.begin("m_phase-save", false);
   m_phase = preferences.getInt("m_phase", 0);
@@ -101,6 +118,17 @@ void loop(void) {
   String s_count_phase_3 = FloatToString(m_phase_state[3],0).c_str();
 
   update_oled(uC_temp, dht22_temp, dht22_hum);
+
+  int touch_value = touchRead(TOUCH_PIN);
+  if (touch_value < 50){
+    u8x8.drawString(0, 4, ("ph = " + FloatToString(m_ph_read, 0)).c_str());
+    u8x8.drawString(0, 5, ("soil " + FloatToString(m_soil_read, 0)).c_str());
+  }
+  else
+  {
+    u8x8.clearLine(4);
+    u8x8.clearLine(5);
+  }
 
   WiFiClient client = server.available();
   
@@ -264,26 +292,51 @@ void check_time(){
    if (s == 1)
     m_is_new_day = true;
    }
-   Serial.print("m_phase is ");
+  measureSoilMoisture(s);
+  measurePH(s);
+  /* Serial.print("m_phase is ");
    Serial.println(m_phase);
    Serial.print("Second is ");
    Serial.println(s);
    Serial.print("epohal is ");
-   Serial.println(ep);
+   Serial.println(ep);*/
 }
 
 void setLED(string state) {
   if (state == "on") {
     LED_State = "on";
-    digitalWrite(led, HIGH); 
-    Serial.print("LED set to ");
-    Serial.println(state.c_str());
+    digitalWrite(LED, HIGH); 
+    //digitalWrite(RELAY_1, LOW);
   }
   if (state == "off") {
     LED_State = "off";
-    digitalWrite(led, LOW);
-    Serial.print("LED set to ");
-    Serial.println(state.c_str());
+    digitalWrite(LED, LOW);
+    //digitalWrite(RELAY_1, HIGH);
+  }
+}
+
+bool temp_s;
+void measureSoilMoisture(int s){
+  if (s<30)
+    digitalWrite(SOIL_VCC, 1);
+  else
+    digitalWrite(SOIL_VCC, 0);
+  if (s == 29 && temp_s) {
+    
+    m_soil_read = analogRead(SOIL_SENSOR);
+    Serial.print("soil moisture is ");
+    Serial.println(m_soil_read);
+    temp_s = false;
+  }
+  if (s == 30)
+    temp_s = true;
+}
+
+void measurePH(int s) {
+  if (s%5 == 0) {
+    m_ph_read = analogRead(PH_METER);
+   // Serial.print("pH is ");
+   // Serial.println(m_ph_read);
   }
 }
 
